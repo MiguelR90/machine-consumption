@@ -13,6 +13,8 @@ totals = [10, 5, 15, 8]
 flush_lock = 21
 transition_lock = 3
 
+mix = dict(zip(products, totals))
+
 # sequence 1
 denominator = sum(totals)
 sequence1 = np.random.choice(
@@ -37,23 +39,21 @@ simulation = simulate(
     reverse=True,
 )
 
-data = []
-for frame, obj in enumerate(simulation["data"]):
-    for machine, mix in obj.items():
-        for product, count in mix.items():
-            data.append(
-                {
-                    "frame": frame,
-                    "machine": f"Machine {machine}",
-                    "product": product,
-                    "count": count,
-                }
-            )
+
+def format_data(data):
+    out = []
+    for f, frame in enumerate(data):
+        tmp = {}
+        for p in products:
+            tmp[p] = [machine[p] for machine in frame.values()]
+        out.append(tmp)
+    return out
+
+
+data = format_data(simulation["data"])
 
 
 # Application start
-
-df = pd.DataFrame().from_records(data)
 
 external_stylesheets = ["https://codepen.io/chriddyp/pen/bWLwgP.css"]
 
@@ -68,7 +68,7 @@ app.layout = html.Div(
         dcc.Graph(id="graph2-with-slider"),
         dcc.Slider(
             0,
-            df["frame"].max(),
+            len(data),
             value=0,
             step=window_size,
             marks=None,
@@ -83,18 +83,28 @@ app.layout = html.Div(
     Input("frame-slider", "value"),
 )
 def update_figure(selected_frame):
-    filtered_df = df[df.frame == selected_frame]
+    frame_data = data[selected_frame]
 
-    fig = px.bar(
-        filtered_df,
-        x="machine",
-        y="count",
-        color="product",
-        text_auto=True,
-        barmode="group",
-    )
+    fig = go.Figure()
+    for prod, counts in frame_data.items():
+        colors = []
+        for c in counts:
+            if c == mix[prod]:
+                colors.append("yellow")
+            else:
+                colors.append("blue")
 
-    fig.update_layout(yaxis_range=[0, 21])
+        fig.add_trace(
+            go.Bar(
+                x=[f"Machine {i}" for i in range(len(counts))],
+                y=counts,
+                name=prod,
+                marker_color=colors,
+                texttemplate="%{y}",
+                textposition="inside",
+            )
+        )
+    fig.update_layout(yaxis_range=[0, 21], barmode="group")
 
     fig2 = go.Figure()
     fig2.add_trace(
