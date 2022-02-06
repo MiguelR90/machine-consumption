@@ -58,7 +58,7 @@ external_stylesheets = ["https://codepen.io/chriddyp/pen/bWLwgP.css"]
 
 app = Dash(__name__)
 
-window_size = 25
+window_size = 50
 
 app.layout = html.Div(
     [
