@@ -61,7 +61,10 @@ def simulate(
     machines = {i: {p: 0 for p in products + ["lock"]} for i in range(num_of_machines)}
     flushes = {i: 0 for i in range(num_of_machines)}
     trash = []
+
     data = []
+    trash_data = []
+    consumption_data = []
 
     for product in sequence:
 
@@ -109,20 +112,27 @@ def simulate(
 
         # Save the data
         data.append(copy.deepcopy(machines))
+        trash_data.append(len(trash))
 
         # Flush ready machines
+        amount_consumed = 0
         for j in machines:
             if all(machines[j][p] == mix[p] for p in products):
                 machines[j] = {p: 0 for p in products + ["lock"]}
                 machines[j]["lock"] = flush_lock
                 flushes[j] += 1
+                amount_consumed += sum(mix.values())
 
-    return (
-        {
+        consumption_data.append(amount_consumed)
+
+    return {
+        "summary": {
             "trash": len(trash),
             "total": len(sequence),
             "consumed": len(sequence) - len(trash),
             "flushes": flushes,
         },
-        data,
-    )
+        "data": data,
+        "trash_data": trash_data,
+        "consumption_data": np.cumsum(consumption_data),
+    }

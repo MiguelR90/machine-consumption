@@ -1,5 +1,6 @@
 from dash import Dash, dcc, html, Input, Output
 import plotly.express as px
+import plotly.graph_objects as go
 
 import numpy as np
 import pandas as pd
@@ -26,7 +27,7 @@ sequence3 = generate_batches(40, products, totals, sample_size)
 
 
 simulation = simulate(
-    9,
+    5,
     sequence1,
     products,
     totals,
@@ -37,7 +38,7 @@ simulation = simulate(
 )
 
 data = []
-for frame, obj in enumerate(simulation[1]):
+for frame, obj in enumerate(simulation["data"]):
     for machine, mix in obj.items():
         for product, count in mix.items():
             data.append(
@@ -65,6 +66,7 @@ window_size = 50
 app.layout = html.Div(
     [
         dcc.Graph(id="graph-with-slider"),
+        dcc.Graph(id="graph2-with-slider"),
         dcc.Slider(0, window_size, value=0, step=1, id="frame-slider"),
         dcc.Slider(0, df["frame"].max(), value=0, step=window_size, id="frame-range"),
     ]
@@ -83,7 +85,10 @@ def set_frame_slider(start_frame):
     return (start_frame, start_frame + window_size, start_frame)
 
 
-@app.callback(Output("graph-with-slider", "figure"), Input("frame-slider", "value"))
+@app.callback(
+    [Output("graph-with-slider", "figure"), Output("graph2-with-slider", "figure")],
+    Input("frame-slider", "value"),
+)
 def update_figure(selected_frame):
     filtered_df = df[df.frame == selected_frame]
 
@@ -98,7 +103,28 @@ def update_figure(selected_frame):
 
     fig.update_layout(yaxis_range=[0, 21])
 
-    return fig
+    fig2 = go.Figure()
+    fig2.add_trace(
+        go.Bar(
+            x=["consumed", "trashed"],
+            y=[
+                simulation["consumption_data"][selected_frame],
+                simulation["trash_data"][selected_frame],
+            ],
+            marker_color=["blue", "red"],
+            texttemplate="%{y}",
+            textposition="inside",
+        )
+    )
+    fig2.update_layout(
+        yaxis_range=[
+            0,
+            max(simulation["consumption_data"][-1], simulation["trash_data"][-1]),
+        ],
+        barmode="stack",
+    )
+
+    return fig, fig2
 
 
 if __name__ == "__main__":
