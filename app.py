@@ -57,6 +57,8 @@ df = pd.DataFrame().from_records(data)
 external_stylesheets = ["https://codepen.io/chriddyp/pen/bWLwgP.css"]
 
 app = Dash(__name__)
+server = app.server
+
 
 window_size = 50
 
