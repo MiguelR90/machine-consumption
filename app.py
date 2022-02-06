@@ -60,29 +60,22 @@ external_stylesheets = ["https://codepen.io/chriddyp/pen/bWLwgP.css"]
 app = Dash(__name__)
 server = app.server
 
-
-window_size = 50
+window_size = 1
 
 app.layout = html.Div(
     [
         dcc.Graph(id="graph-with-slider"),
         dcc.Graph(id="graph2-with-slider"),
-        dcc.Slider(0, window_size, value=0, step=1, id="frame-slider"),
-        dcc.Slider(0, df["frame"].max(), value=0, step=window_size, id="frame-range"),
+        dcc.Slider(
+            0,
+            df["frame"].max(),
+            value=0,
+            step=window_size,
+            marks=None,
+            id="frame-slider",
+        ),
     ]
 )
-
-
-@app.callback(
-    [
-        Output("frame-slider", "min"),
-        Output("frame-slider", "max"),
-        Output("frame-slider", "value"),
-    ],
-    Input("frame-range", "value"),
-)
-def set_frame_slider(start_frame):
-    return (start_frame, start_frame + window_size, start_frame)
 
 
 @app.callback(
