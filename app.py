@@ -15,6 +15,8 @@ transition_lock = 3
 
 mix = dict(zip(products, totals))
 
+color_map = dict(zip(products + ["full"], px.colors.qualitative.Plotly))
+
 # sequence 1
 denominator = sum(totals)
 sequence1 = np.random.choice(
@@ -90,9 +92,9 @@ def update_figure(selected_frame):
         colors = []
         for c in counts:
             if c == mix[prod]:
-                colors.append("yellow")
+                colors.append(color_map["full"])
             else:
-                colors.append("blue")
+                colors.append(color_map[prod])
 
         fig.add_trace(
             go.Bar(
