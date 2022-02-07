@@ -1,6 +1,8 @@
 import plotly.express as px
 import plotly.graph_objects as go
-from dash import Dash, dcc, html, Input, Output
+from dash import Dash, dcc, html, Input, Output, State
+
+import json
 
 import numpy as np
 import pandas as pd
@@ -8,44 +10,22 @@ from flask_caching import Cache
 
 from simulator import generate_batches, simulate, double_priority
 
-sample_size = 1000
-products = ["A", "B", "C", "D"]
-totals = [10, 5, 15, 8]
-flush_lock = 21
-transition_lock = 3
 
-mix = dict(zip(products, totals))
-
-color_map = dict(zip(products + ["full"], px.colors.qualitative.Plotly))
-
-# sequence 1
-denominator = sum(totals)
-sequence1 = np.random.choice(
-    products, size=sample_size, p=[t / denominator for t in totals]
-).tolist()
-
-# sequence 2
-sequence2 = generate_batches(20, products, totals, sample_size)
-
-# sequence 3
-sequence3 = generate_batches(40, products, totals, sample_size)
+def generate_product_sequence(
+    sample_size, sequence_type, sequence_batch_size, products, product_mix
+):
+    if sequence_type == "random":
+        denominator = sum(product_mix)
+        return np.random.choice(
+            products, size=sample_size, p=[t / denominator for t in product_mix]
+        ).tolist()
+    else:
+        return generate_batches(sequence_batch_size, products, product_mix, sample_size)
 
 
-simulation = simulate(
-    5,
-    sequence1,
-    products,
-    totals,
-    flush_lock,
-    transition_lock,
-    double_priority,
-    reverse=True,
-)
-
-
-def format_data(data):
+def format_data(data, products):
     out = []
-    for f, frame in enumerate(data):
+    for frame in data:
         tmp = {}
         for p in products:
             tmp[p] = [machine[p] for machine in frame.values()]
@@ -53,7 +33,40 @@ def format_data(data):
     return out
 
 
-data = format_data(simulation["data"])
+def generate_simulation_data(
+    num_of_machines,
+    products,
+    product_mix,
+    flush_lock,
+    transition_lock,
+    priority_type,
+    sample_size,
+    sequence_type,
+    sequence_batch_size,
+):
+    # mix = dict(zip(products, product_mix))
+    # color_map = dict(zip(products, px.colors.qualitative.Plotly))
+    sequence = generate_product_sequence(
+        sample_size, sequence_type, sequence_batch_size, products, product_mix
+    )
+
+    if priority_type == "double":
+        priority_func = double_priority
+    else:
+        priority_func = double_priority
+
+    simulation = simulate(
+        num_of_machines,
+        sequence,
+        products,
+        product_mix,
+        flush_lock,
+        transition_lock,
+        priority_func,
+        reverse=True,
+    )
+
+    return format_data(simulation["data"], products)
 
 
 # Application start
@@ -62,24 +75,20 @@ external_stylesheets = ["https://codepen.io/chriddyp/pen/bWLwgP.css"]
 
 app = Dash(__name__)
 server = app.server
-cache = Cache(
-    app.server, config={"CACHE_TYPE": "filesystem", "CACHE_DIR": "cache-directory"}
-)
-app.config.suppress_callback_exceptions = True
-timeout = 20
-
-
-window_size = 1
 
 app.layout = html.Div(
     [
+        dcc.Input(id="products-input", type="text", value="A,B,C,D"),
+        dcc.Input(id="product_mix-input", type="text", value="10,5,15,8"),
+        dcc.Input(id="num_of_machines-input", type="number", value=5),
+        dcc.Input(id="sample_size-input", type="number", value=1000),
+        html.Button(id="run-button", n_clicks=0, children="Simulate"),
+        dcc.Store(id="simulation-data"),
         dcc.Graph(id="graph-with-slider"),
-        dcc.Graph(id="graph2-with-slider"),
         dcc.Slider(
             0,
-            len(data),
-            value=0,
-            step=window_size,
+            100,
+            step=1,
             marks=None,
             id="frame-slider",
         ),
@@ -88,56 +97,69 @@ app.layout = html.Div(
 
 
 @app.callback(
-    [Output("graph-with-slider", "figure"), Output("graph2-with-slider", "figure")],
+    Output("simulation-data", "data"),
+    Input("run-button", "n_clicks"),
+    State("products-input", "value"),
+    State("product_mix-input", "value"),
+    State("num_of_machines-input", "value"),
+    State("sample_size-input", "value"),
+)
+def clean_data(n_clicks, product_str, product_mix_str, num_of_machines, sample_size):
+
+    products = list(product_str.split(","))
+    product_mix = [int(mix) for mix in product_mix_str.split(",")]
+
+    simulation_data = generate_simulation_data(
+        num_of_machines,
+        products,
+        product_mix,
+        21,
+        0,
+        "double",
+        sample_size,
+        "random",
+        40,
+    )
+
+    return json.dumps(simulation_data)
+
+
+@app.callback(
+    [
+        Output("frame-slider", "max"),
+        Output("frame-slider", "value"),
+    ],
+    Input("simulation-data", "data"),
+)
+def reset_slider_after_data_update(jsonified_data):
+    data = json.loads(jsonified_data)
+    return len(data)-1, 0
+
+
+@app.callback(
+    Output("graph-with-slider", "figure"),
+    State("simulation-data", "data"),
     Input("frame-slider", "value"),
 )
-@cache.memoize(timeout=timeout)
-def update_figure(selected_frame):
+def update_figure(jsonified_data, selected_frame):
+    data = json.loads(jsonified_data)
     frame_data = data[selected_frame]
 
     fig = go.Figure()
     for prod, counts in frame_data.items():
-        colors = []
-        for c in counts:
-            if c == mix[prod]:
-                colors.append(color_map["full"])
-            else:
-                colors.append(color_map[prod])
 
         fig.add_trace(
             go.Bar(
                 x=[f"Machine {i}" for i in range(len(counts))],
                 y=counts,
                 name=prod,
-                marker_color=colors,
                 texttemplate="%{y}",
                 textposition="inside",
             )
         )
     fig.update_layout(yaxis_range=[0, 21], barmode="group")
 
-    fig2 = go.Figure()
-    fig2.add_trace(
-        go.Bar(
-            x=["consumed", "trashed"],
-            y=[
-                simulation["consumption_data"][selected_frame],
-                simulation["trash_data"][selected_frame],
-            ],
-            marker_color=["blue", "red"],
-            texttemplate="%{y}",
-            textposition="inside",
-        )
-    )
-    fig2.update_layout(
-        yaxis_range=[
-            0,
-            max(simulation["consumption_data"][-1], simulation["trash_data"][-1]),
-        ],
-        barmode="stack",
-    )
-
-    return fig, fig2
+    return fig
 
 
 if __name__ == "__main__":

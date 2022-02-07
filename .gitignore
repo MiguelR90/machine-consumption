@@ -1,7 +1,7 @@
-*.png
+*__pycache__*
+*.gif
 *.jpeg
 *.jpg
-*.gif
-*/.ipynb_checkpoints/*
-*__pycache__*
-cache-directory/*
+*.png
+*/.ipynb_checkpoints
+cache-directory
