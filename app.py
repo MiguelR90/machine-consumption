@@ -1,9 +1,10 @@
-from dash import Dash, dcc, html, Input, Output
 import plotly.express as px
 import plotly.graph_objects as go
+from dash import Dash, dcc, html, Input, Output
 
 import numpy as np
 import pandas as pd
+from flask_caching import Cache
 
 from simulator import generate_batches, simulate, double_priority
 
@@ -61,6 +62,12 @@ external_stylesheets = ["https://codepen.io/chriddyp/pen/bWLwgP.css"]
 
 app = Dash(__name__)
 server = app.server
+cache = Cache(
+    app.server, config={"CACHE_TYPE": "filesystem", "CACHE_DIR": "cache-directory"}
+)
+app.config.suppress_callback_exceptions = True
+timeout = 20
+
 
 window_size = 1
 
@@ -84,6 +91,7 @@ app.layout = html.Div(
     [Output("graph-with-slider", "figure"), Output("graph2-with-slider", "figure")],
     Input("frame-slider", "value"),
 )
+@cache.memoize(timeout=timeout)
 def update_figure(selected_frame):
     frame_data = data[selected_frame]
 
