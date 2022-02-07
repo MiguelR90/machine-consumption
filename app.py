@@ -5,8 +5,6 @@ from dash import Dash, dcc, html, Input, Output, State
 import json
 
 import numpy as np
-import pandas as pd
-from flask_caching import Cache
 
 from simulator import generate_batches, simulate, double_priority
 
@@ -133,7 +131,7 @@ def clean_data(n_clicks, product_str, product_mix_str, num_of_machines, sample_s
 )
 def reset_slider_after_data_update(jsonified_data):
     data = json.loads(jsonified_data)
-    return len(data)-1, 0
+    return len(data) - 1, 0
 
 
 @app.callback(
