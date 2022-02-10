@@ -83,12 +83,20 @@ app.layout = html.Div(
         html.Button(id="run-button", n_clicks=0, children="Simulate"),
         dcc.Store(id="simulation-data"),
         dcc.Graph(id="graph-with-slider"),
+        dcc.Store(id="graph-with-slider-store"),
         dcc.Slider(
             0,
             100,
             step=1,
             marks=None,
             id="frame-slider",
+        ),
+        html.Hr(),
+        html.Details(
+            [
+                html.Summary("Contents of figure storage"),
+                dcc.Markdown(id="clientside-figure-json"),
+            ]
         ),
     ]
 )
@@ -136,6 +144,7 @@ def reset_slider_after_data_update(jsonified_data):
 
 @app.callback(
     Output("graph-with-slider", "figure"),
+    Output("graph-with-slider-store", "data"),
     State("simulation-data", "data"),
     Input("frame-slider", "value"),
 )
@@ -157,7 +166,16 @@ def update_figure(jsonified_data, selected_frame):
         )
     fig.update_layout(yaxis_range=[0, 21], barmode="group")
 
-    return fig
+    # import pdb; pdb.set_trace()
+    return fig, fig
+
+
+@app.callback(
+    Output("clientside-figure-json", "children"),
+    Input("graph-with-slider-store", "data"),
+)
+def generated_px_figure_json(data):
+    return "```\n" + json.dumps(data, indent=2) + "\n```"
 
 
 if __name__ == "__main__":
