@@ -131,10 +131,8 @@ def clean_data(n_clicks, product_str, product_mix_str, num_of_machines, sample_s
 
 
 @app.callback(
-    [
-        Output("frame-slider", "max"),
-        Output("frame-slider", "value"),
-    ],
+    Output("frame-slider", "max"),
+    Output("frame-slider", "value"),
     Input("simulation-data", "data"),
 )
 def reset_slider_after_data_update(jsonified_data):
@@ -143,17 +141,14 @@ def reset_slider_after_data_update(jsonified_data):
 
 
 @app.callback(
-    Output("graph-with-slider", "figure"),
     Output("graph-with-slider-store", "data"),
-    State("simulation-data", "data"),
-    Input("frame-slider", "value"),
+    Input("simulation-data", "data"),
 )
-def update_figure(jsonified_data, selected_frame):
-    data = json.loads(jsonified_data)
-    frame_data = data[selected_frame]
+def update_figure(jsonified_data):
+    data = json.loads(jsonified_data)[0]
 
     fig = go.Figure()
-    for prod, counts in frame_data.items():
+    for prod, counts in data.items():
 
         fig.add_trace(
             go.Bar(
@@ -166,13 +161,39 @@ def update_figure(jsonified_data, selected_frame):
         )
     fig.update_layout(yaxis_range=[0, 21], barmode="group")
 
-    # import pdb; pdb.set_trace()
-    return fig, fig
+    return fig
+
+
+app.clientside_callback(
+    """
+    function(figure, frame, data_str) {
+
+        if(figure === undefined) {
+            return {'data': [], 'layout': {}};
+        }
+
+        let data = JSON.parse(data_str)[frame];
+
+        let fig = Object.assign({}, figure);
+
+        for (let i = 0; i < fig.data.length; i++) {
+            let product = fig.data[i].name;
+            fig.data[i].y = data[product];
+        }
+
+        return fig;
+    }
+    """,
+    Output("graph-with-slider", "figure"),
+    Input("graph-with-slider-store", "data"),
+    Input("frame-slider", "value"),
+    State("simulation-data", "data"),
+)
 
 
 @app.callback(
     Output("clientside-figure-json", "children"),
-    Input("graph-with-slider-store", "data"),
+    Input("graph-with-slider", "figure"),
 )
 def generated_px_figure_json(data):
     return "```\n" + json.dumps(data, indent=2) + "\n```"
